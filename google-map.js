@@ -2,6 +2,9 @@ const { Builder } = require("selenium-webdriver");
 const chrome = require("selenium-webdriver/chrome");
 const http = require('http');
 const axios = require('axios');
+const mysql = require('mysql2/promise');
+
+
 
 // Function to get the driver
 const get_driver = async () => {
@@ -12,7 +15,7 @@ const get_driver = async () => {
     options.addArguments("--disable-blink-features=AutomationControlled");
     options.addArguments("--remote-debugging-port=9222");
     options.addArguments("--start-maximized");
-    // options.addArguments("--headless");
+    options.addArguments("--headless");
     options.addArguments("--force-device-scale-factor=0.8");
     
     return await new Builder().forBrowser("chrome").setChromeOptions(options).build();
@@ -32,9 +35,6 @@ const google_map = async (data) => {
         await driver.findElement({ name: "q" }).sendKeys('\uE007');
         await driver.sleep(5000);
 
-        
-
-        
         try {
             const firstResult = await driver.findElement({ css: 'div[aria-label^="Results for '+query+'"]' });
 
@@ -74,7 +74,6 @@ const google_map = async (data) => {
 
                     const mainElement = await driver.findElement({ css: 'div[jstcache="4"]' });
             
-                    // Get company name
                     let companyh1 = await mainElement.findElement({ css: 'h1' });
                     collection['company_name'] = (await companyh1.getText()).toString() ?? '';
 
@@ -82,11 +81,9 @@ const google_map = async (data) => {
                         const parentDiv = await companyh1.findElement({ xpath: '..' }).findElement({ xpath: '..' });
                         const secondInnerDiv = await parentDiv.findElement({ xpath: './div[2]' });
 
-                        // Get company type
                         const buttonElement = await secondInnerDiv.findElement({ css: 'button' });
                         collection['company_type'] = await buttonElement.getText() ?? '';
     
-                        // Get Rating and Review
                         const spanElements = await secondInnerDiv.findElements({ css: 'span' });
                         const spanTexts = [];
                         for (let spanElement of spanElements) {
@@ -100,7 +97,6 @@ const google_map = async (data) => {
                     } catch (error) {}
 
 
-                    // Get region
                     const regionElements = await mainElement.findElement({ css: 'div[aria-label="Information for '+collection['company_name']+'"]' });
 
                     try {
@@ -129,7 +125,6 @@ const google_map = async (data) => {
                         collection['map'] = plus_codeel[1];
                     } catch (error) {}
 
-                    // Get all image links
                     const imageElements = await mainElement.findElements({ css: 'img' });
                     const imageLinks = [];
                     for (let imageElement of imageElements) {
@@ -174,13 +169,39 @@ const google_map = async (data) => {
                         }
                     } catch (error) {}
 
-                    // Store the collected data in json_data property
                     try {
-                        const response = await axios.post('http://localhost/map-scaper.php', collection);
-                        console.log('Response from API:', response.data);
+                        const connection = await mysql.createConnection({
+                            host: 'localhost',
+                            user: 'root',
+                            password: '@fronure2025_Ltd',
+                            database: 'others'
+                        });
 
+                        const query = `
+                            INSERT INTO maps_pharmacy (
+                                company_name, company_type, rating, total_review, address, website, phone, map, images, reviews
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `;
+
+                        const values = [
+                            collection.company_name ?? null,
+                            collection.company_type ?? null,
+                            collection.rating ?? null,
+                            collection.total_review ?? null,
+                            collection.address ?? null,
+                            collection.website ?? null,
+                            collection.phone ?? null,
+                            collection.map ?? null,
+                            JSON.stringify(collection.images ?? []),
+                            JSON.stringify(collection.reviews ?? [])
+                        ];
+
+                        const [result] = await connection.execute(query, values);
+                        console.log('Data inserted into MySQL:', result.insertId);
                     } catch (error) {
-                        console.error('Error sending data to the API:', error);
+                        console.error('Error inserting data into MySQL:', error);
+                    } finally {
+                        await connection.end();
                     }
 
                 } catch (error) {}

@@ -1,0 +1,31 @@
+================GOOGLE MAP DATABASE START=====================
+
+CREATE TABLE `maps_pharmacy` (
+  `id` int NOT NULL,
+  `company_name` varchar(255) DEFAULT NULL,
+  `company_type` varchar(255) DEFAULT NULL,
+  `rating` varchar(255) DEFAULT NULL,
+  `total_review` varchar(255) DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `website` varchar(255) DEFAULT NULL,
+  `phone` varchar(255) DEFAULT NULL,
+  `map` varchar(255) DEFAULT NULL,
+  `images` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
+  `reviews` text,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+
+ALTER TABLE `maps_pharmacy`
+  ADD PRIMARY KEY (`id`);
+
+ALTER TABLE `maps_pharmacy`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+
+POST METHOD PRELOAD
+{
+    "keyword": "pharmacy near Charpara Road,",
+    "location": "Mymensingh",
+    "platform": "google-map"
+}
+================GOOGLE MAP DATABASE END=====================
