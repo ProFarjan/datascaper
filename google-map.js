@@ -3,6 +3,7 @@ const chrome = require("selenium-webdriver/chrome");
 const http = require('http');
 const axios = require('axios');
 const mysql = require('mysql2/promise');
+const fs = require('fs');
 
 
 
@@ -21,10 +22,27 @@ const get_driver = async () => {
     return await new Builder().forBrowser("chrome").setChromeOptions(options).build();
 }
 
+// Function to send SMS via POST request
+const send_sms = async (phoneNumber, message) => {
+    try {
+        const response = await axios.post('https://sms-provider-api.com/send', {
+            to: phoneNumber,
+            message: message
+        }, {
+            headers: {
+                'Authorization': 'Bearer YOUR_API_KEY',
+                'Content-Type': 'application/json'
+            }
+        });
+        console.log('SMS sent successfully:', response.data);
+    } catch (error) {
+        console.error('Error sending SMS:', error.response?.data || error.message);
+    }
+};
+
 // Function to open google maps
 const google_map = async (data) => {
     let driver = await get_driver();
-    const collection = [];
     try {
         const query = data.keyword + " " + data.location;
         await driver.executeScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
@@ -36,12 +54,13 @@ const google_map = async (data) => {
         await driver.sleep(5000);
 
         try {
+
             const firstResult = await driver.findElement({ css: 'div[aria-label^="Results for '+query+'"]' });
 
             await driver.sleep(1000);
-
             const myResult = await firstResult.findElement({ xpath: './/h1[contains(text(), "Results")][1]' });
             myResult.click();
+            console.log('Clicked on Results');
 
             while (true) {
                 try {
@@ -51,18 +70,21 @@ const google_map = async (data) => {
                     }
                 } catch (error) {}
                 await driver.actions().sendKeys('\uE015').perform();
-                await driver.sleep(100);
+                await driver.sleep(50);
             }
             
-            let childDivs = await firstResult.findElements({ xpath: './div[not(contains(@class, "TFQHme "))]' });
-            console.log('Child Divs:', childDivs.length);
+            await driver.sleep(1500);
+
+            let childDivs = await firstResult.findElements({ xpath: './div[not(contains(@class, "TFQHme ")) and not(@class="") and normalize-space(.) != ""]' });
+            childDivs.pop();
+            console.log('Total Data Found: ', childDivs.length);
 
             let index = 0;
             while (index < childDivs.length) {
                 if (!childDivs[index]) {
-                    console.log("No more data found!");
                     break;
                 }
+                
                 let childDiv = childDivs[index];
                 console.log('Index:', index);
 
@@ -73,9 +95,12 @@ const google_map = async (data) => {
                     let collection = {};
 
                     const mainElement = await driver.findElement({ css: 'div[jstcache="4"]' });
-            
-                    let companyh1 = await mainElement.findElement({ css: 'h1' });
-                    collection['company_name'] = (await companyh1.getText()).toString() ?? '';
+                    
+                    let companyh1;
+                    try {
+                        companyh1 = await mainElement.findElement({ css: 'h1' });
+                        collection['company_name'] = (await companyh1.getText()).toString() ?? '';
+                    } catch (error) {}
 
                     try {
                         const parentDiv = await companyh1.findElement({ xpath: '..' }).findElement({ xpath: '..' });
@@ -96,8 +121,10 @@ const google_map = async (data) => {
                         collection['total_review'] = spanTexts[1] ?? '';
                     } catch (error) {}
 
-
-                    const regionElements = await mainElement.findElement({ css: 'div[aria-label="Information for '+collection['company_name']+'"]' });
+                    let regionElements;
+                    try {
+                        regionElements = await mainElement.findElement({ css: 'div[aria-label="Information for '+collection['company_name']+'"]' });
+                    } catch (error) {}
 
                     try {
                         const regionTexts = await regionElements.findElement({ css: 'button[data-tooltip="Copy address"]' });
@@ -138,7 +165,7 @@ const google_map = async (data) => {
                     try {
                         const review_button = await mainElement.findElement({ css: 'button[aria-label="Reviews for '+collection['company_name']+'"]' });
                         await review_button.click();
-                        await driver.sleep(7000);
+                        await driver.sleep(3000);
 
                         const refineReview = await mainElement.findElement({ css: 'div[aria-label="Refine reviews"]' });
                         const nextDiv = await refineReview.findElement({ xpath: './following-sibling::div' });
@@ -169,8 +196,9 @@ const google_map = async (data) => {
                         }
                     } catch (error) {}
 
+                    let connection;
                     try {
-                        const connection = await mysql.createConnection({
+                        connection = await mysql.createConnection({
                             host: 'localhost',
                             user: 'root',
                             password: '@fronure2025_Ltd',
@@ -201,23 +229,27 @@ const google_map = async (data) => {
                     } catch (error) {
                         console.error('Error inserting data into MySQL:', error);
                     } finally {
-                        await connection.end();
+                        if (connection) {
+                            await connection.end();
+                        }
                     }
 
-                } catch (error) {}
+                } catch (error) {
+                    console.log("data error: ", error);
+                }
 
                 index++;
             }
 
         } catch (error) {
-            console.log("Error 1:", error);
+            console.log("after search data: ", error);
         }
 
     } catch (error) {
-        console.log("Error 2:", error);
+        console.log("before search data: ", error);
     } finally {
         await driver.quit();
-        console.log("finined scapting........")
+        console.log("........finined scapting........")
     }
 };
 
