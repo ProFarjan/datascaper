@@ -12,6 +12,7 @@ const get_driver = async () => {
     options.addArguments("--disable-blink-features=AutomationControlled");
     options.addArguments("--remote-debugging-port=9222");
     options.addArguments("--start-maximized");
+    // options.addArguments("--headless");
     options.addArguments("--force-device-scale-factor=0.8");
     
     return await new Builder().forBrowser("chrome").setChromeOptions(options).build();
@@ -32,16 +33,31 @@ const google_map = async (data) => {
         await driver.sleep(5000);
 
         
+
+        
         try {
             const firstResult = await driver.findElement({ css: 'div[aria-label^="Results for '+query+'"]' });
-            await driver.executeScript("arguments[0].scrollIntoView(true);", firstResult);
-            await driver.sleep(2000);
-            let childDivs = await firstResult.findElements({ xpath: './div[not(contains(@class, "TFQHme "))]' });
 
-            childDivs.splice(0, 2);
-            let index = 0;
-            let loadingLimit = 4;
+            await driver.sleep(1000);
+
+            const myResult = await firstResult.findElement({ xpath: './/h1[contains(text(), "Results")][1]' });
+            myResult.click();
+
+            while (true) {
+                try {
+                    const endOfListText = await driver.findElement({ xpath: '//*[contains(text(), "You\'ve reached the end of the list.")]' });
+                    if (endOfListText) {
+                        break;
+                    }
+                } catch (error) {}
+                await driver.actions().sendKeys('\uE015').perform();
+                await driver.sleep(100);
+            }
+            
+            let childDivs = await firstResult.findElements({ xpath: './div[not(contains(@class, "TFQHme "))]' });
             console.log('Child Divs:', childDivs.length);
+
+            let index = 0;
             while (index < childDivs.length) {
                 if (!childDivs[index]) {
                     console.log("No more data found!");
@@ -49,15 +65,6 @@ const google_map = async (data) => {
                 }
                 let childDiv = childDivs[index];
                 console.log('Index:', index);
-
-                await driver.actions().sendKeys('\uE015').perform();
-                await driver.actions().sendKeys('\uE015').perform();
-                await driver.actions().sendKeys('\uE015').perform();
-                await driver.actions().sendKeys('\uE015').perform();
-                await driver.actions().sendKeys('\uE015').perform();
-                await driver.actions().sendKeys('\uE015').perform();
-                await driver.actions().sendKeys('\uE015').perform();
-                await driver.actions().sendKeys('\uE015').perform();
 
                 try {
                     await childDiv.click();
@@ -169,37 +176,27 @@ const google_map = async (data) => {
 
                     // Store the collected data in json_data property
                     try {
-                        await axios.post('http://agenticai.localhost.com/api/json-records', collection);
-                        console.log('Data successfully sent to the API');
-                        
-                        await driver.actions().sendKeys('\uE015').perform();
-                        await driver.actions().sendKeys('\uE015').perform();
-                        await driver.actions().sendKeys('\uE015').perform();
-                        await driver.actions().sendKeys('\uE015').perform();
-                        await driver.actions().sendKeys('\uE015').perform();
-                        await driver.actions().sendKeys('\uE015').perform();
+                        const response = await axios.post('http://localhost/map-scaper.php', collection);
+                        console.log('Response from API:', response.data);
 
                     } catch (error) {
                         console.error('Error sending data to the API:', error);
                     }
 
-                    if (index == loadingLimit) {
-                        childDivs = await firstResult.findElements({ xpath: './div[not(contains(@class, "TFQHme "))]' });
-                        await driver.sleep(5000);
-                        loadingLimit += 4;
-                        console.log('Loading Limit:', loadingLimit);
-                    }
                 } catch (error) {}
 
                 index++;
             }
 
-        } catch (error) {}
+        } catch (error) {
+            console.log("Error 1:", error);
+        }
 
     } catch (error) {
-
+        console.log("Error 2:", error);
     } finally {
         await driver.quit();
+        console.log("finined scapting........")
     }
 };
 

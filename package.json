@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "datascaper.js",
   "scripts": {
-    "dev": "node datascaper.js",
+    "start": "node datascaper.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
